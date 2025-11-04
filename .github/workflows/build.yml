@@ -1,0 +1,45 @@
+name: Build DaemonBSD ISO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget xorriso rsync
+
+      - name: Download base ISO
+        run: |
+          wget https://download.freebsd.org/ftp/releases/ISO-IMAGES/13.2/FreeBSD-13.2-RELEASE-amd64-disc1.iso -O base.iso
+          mkdir work out
+          sudo mount -o loop base.iso work || true
+          rsync -a work/ out/
+          sudo umount work || true
+
+      - name: Add DaemonBSD assets
+        run: |
+          mkdir -p out/usr/local/share/daemonbsd
+          rsync -a assets/ out/usr/local/share/daemonbsd/
+          echo "DaemonBSD remaster" > out/usr/local/share/daemonbsd/info.txt
+
+      - name: Rebuild ISO
+        run: |
+          xorriso -as mkisofs \
+            -r -V "DaemonBSD" \
+            -o DaemonBSD.iso \
+            -J -joliet-long -l \
+            -b boot/cdboot -no-emul-boot -boot-load-size 4 -boot-info-table \
+            out/
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: DaemonBSD.iso
+          path: DaemonBSD.iso
